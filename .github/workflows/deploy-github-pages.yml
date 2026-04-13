@@ -1,0 +1,71 @@
+# Build & deploy Vite app to GitHub Pages (branch: main)
+# Repo Settings → Pages → Source: GitHub Actions
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Optional: add the same VITE_* names as Repository variables
+      # (Settings → Secrets and variables → Actions → Variables) so production links work.
+      - name: Build
+        run: npm run build
+        env:
+          GITHUB_ACTIONS: "true"
+          VITE_DASHBOARD_URL: ${{ vars.VITE_DASHBOARD_URL }}
+          VITE_WEB_WINDOWS_DOWNLOAD: ${{ vars.VITE_WEB_WINDOWS_DOWNLOAD }}
+          VITE_WEB_WINDOWS_DASHBOARD: ${{ vars.VITE_WEB_WINDOWS_DASHBOARD }}
+          VITE_WEB_WINDOWS_HANDOUT: ${{ vars.VITE_WEB_WINDOWS_HANDOUT }}
+          VITE_WEB_MAC_DOWNLOAD: ${{ vars.VITE_WEB_MAC_DOWNLOAD }}
+          VITE_WEB_MAC_DASHBOARD: ${{ vars.VITE_WEB_MAC_DASHBOARD }}
+          VITE_WEB_MAC_HANDOUT: ${{ vars.VITE_WEB_MAC_HANDOUT }}
+          VITE_DESKTOP_WINDOWS_DOWNLOAD: ${{ vars.VITE_DESKTOP_WINDOWS_DOWNLOAD }}
+          VITE_DESKTOP_WINDOWS_DASHBOARD: ${{ vars.VITE_DESKTOP_WINDOWS_DASHBOARD }}
+          VITE_DESKTOP_WINDOWS_HANDOUT: ${{ vars.VITE_DESKTOP_WINDOWS_HANDOUT }}
+          VITE_DESKTOP_MAC_DOWNLOAD: ${{ vars.VITE_DESKTOP_MAC_DOWNLOAD }}
+          VITE_DESKTOP_MAC_DASHBOARD: ${{ vars.VITE_DESKTOP_MAC_DASHBOARD }}
+          VITE_DESKTOP_MAC_HANDOUT: ${{ vars.VITE_DESKTOP_MAC_HANDOUT }}
+          VITE_USE_RAW_DOWNLOAD_URL: ${{ vars.VITE_USE_RAW_DOWNLOAD_URL }}
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
