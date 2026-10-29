@@ -1,164 +1,117 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import {
-  AppWindow,
   ArrowRight,
+  BookOpen,
   Download,
   ExternalLink,
-  FileText,
   Globe,
-  Laptop,
+  LayoutDashboard,
+  Lock,
   Monitor,
   Sparkles,
   X,
-  ChevronLeft,
 } from "lucide-react";
 import { getLinksFor } from "./config/links.js";
+
+const BASE = import.meta.env.BASE_URL;
 
 const PRODUCT = {
   title: "Insights Discovery AI",
   description:
-    "Insights Discovery AI Description — access the web experience or install the desktop application. Pick your channel, then your platform, and open downloads, the live dashboard, or product handouts.",
+    "Your gateway to Insights Discovery AI. Pick how you want to work — install the desktop application, or wait for the browser experience that is on its way.",
 };
 
-const MAIN_CARDS = {
-  web: {
-    id: "web",
-    label: "Web",
-    subtitle: "Browser-based access",
-    description:
-      "Run Insights Discovery AI in a supported browser without installing a desktop client. Best for quick demos, shared machines, and environments where installs are restricted. Choose Windows or macOS-aligned browser builds in the next step.",
-    icon: Globe,
-  },
-  desktop: {
+const CHANNELS = [
+  {
     id: "desktop",
     label: "Desktop",
     subtitle: "Native application",
     description:
-      "Install the full desktop experience for deeper integrations, offline-capable workflows, and the Windows installer from your SharePoint folder. Select your operating system in the popup to get download, dashboard, and handout links.",
+      "Install the full desktop experience, open the product handbook and jump straight into the live dashboard — all from one place.",
     icon: Monitor,
+    locked: false,
   },
-};
-
-const PLATFORMS = {
-  windows: {
-    id: "windows",
-    label: "Windows",
+  {
+    id: "web",
+    label: "Web",
+    subtitle: "Browser-based access",
     description:
-      "Use this path for Windows 10/11 builds. The desktop installer is packaged as a ZIP containing the setup bundle; the web row may reference a Windows-targeted browser package when available.",
-    icon: AppWindow,
+      "Run Insights Discovery AI right in your browser with nothing to install. This version is being finalised and will be available soon.",
+    icon: Globe,
+    locked: true,
   },
-  mac: {
-    id: "mac",
-    label: "Mac",
-    description:
-      "Apple silicon and Intel builds are listed here when published. Web entries may point to a macOS-optimized bundle; desktop entries use DMG or PKG links from your share folder when you add them in `.env`.",
-    icon: Laptop,
+];
+
+const RESOURCES = [
+  {
+    id: "handbook",
+    linkKey: "handout",
+    label: "Handbook",
+    description: "Open the product handbook and learn how everything works.",
+    action: "Open handbook",
+    icon: BookOpen,
   },
-};
+  {
+    id: "application",
+    linkKey: "download",
+    label: "Application",
+    description: "Download and install the application on your computer.",
+    action: "Download app",
+    icon: Download,
+  },
+  {
+    id: "dashboard",
+    linkKey: "dashboard",
+    label: "Dashboard",
+    description: "Go to the live dashboard and start exploring insights.",
+    action: "Open dashboard",
+    icon: LayoutDashboard,
+  },
+];
 
-function ActionLinks({ channel, platform }) {
-  const links = getLinksFor(channel, platform);
-  const isDesktop = channel === "desktop";
-
-  const downloadLabel = isDesktop
-    ? "Download application"
-    : "Download package";
-
-  const guard = (url, e) => {
-    if (!url) e.preventDefault();
+/** Pick the link for the visitor's OS, falling back to the other OS if unset. */
+function resolveLinks(channel) {
+  const isMac = /Mac|iPhone|iPad/i.test(navigator.userAgent);
+  const primary = getLinksFor(channel, isMac ? "mac" : "windows");
+  const fallback = getLinksFor(channel, isMac ? "windows" : "mac");
+  return {
+    download: primary.download || fallback.download,
+    dashboard: primary.dashboard || fallback.dashboard,
+    handout: primary.handout || fallback.handout,
   };
-
-  return (
-    <div className="action-grid">
-      <a
-        className="action-btn action-btn--primary"
-        href={links.download || "#"}
-        onClick={(e) => guard(links.download, e)}
-        target="_blank"
-        rel="noopener"
-        aria-disabled={!links.download}
-      >
-        <Download size={18} aria-hidden />
-        <span>{downloadLabel}</span>
-      </a>
-      <a
-        className="action-btn"
-        href={links.dashboard || "#"}
-        onClick={(e) => guard(links.dashboard, e)}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-disabled={!links.dashboard}
-      >
-        <ExternalLink size={18} aria-hidden />
-        <span>Dashboard</span>
-      </a>
-      <a
-        className="action-btn"
-        href={links.handout || "#"}
-        onClick={(e) => guard(links.handout, e)}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-disabled={!links.handout}
-      >
-        <FileText size={18} aria-hidden />
-        <span>Handout</span>
-      </a>
-    </div>
-  );
 }
 
 export default function ProductAccessPortal() {
-  const [modal, setModal] = useState(null);
-
-  const closeModal = useCallback(() => setModal(null), []);
-
-  const openChannel = useCallback((channel) => {
-    setModal({ channel, step: "platform" });
-  }, []);
-
-  const selectPlatform = useCallback((platform) => {
-    setModal((m) =>
-      m ? { ...m, step: "actions", platform } : null
-    );
-  }, []);
-
-  const goBackInModal = useCallback(() => {
-    setModal((m) => {
-      if (!m) return null;
-      if (m.step === "actions") {
-        return { channel: m.channel, step: "platform" };
-      }
-      return null;
-    });
-  }, []);
+  const [openChannel, setOpenChannel] = useState(null);
+  const closeModal = useCallback(() => setOpenChannel(null), []);
 
   useEffect(() => {
-    if (!modal) return undefined;
+    if (!openChannel) return undefined;
     const onKey = (e) => {
       if (e.key === "Escape") closeModal();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [modal, closeModal]);
-
-  useEffect(() => {
-    if (modal) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = prev;
-      };
-    }
-    return undefined;
-  }, [modal]);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [openChannel, closeModal]);
 
   return (
     <div className="portal">
+      <div className="bg-orbs" aria-hidden>
+        <span className="bg-orbs__orb bg-orbs__orb--a" />
+        <span className="bg-orbs__orb bg-orbs__orb--b" />
+        <span className="bg-orbs__orb bg-orbs__orb--c" />
+      </div>
+
       <header className="site-header">
         <div className="site-header__inner">
           <img
             className="site-header__logo"
-            src="/hp_logo.png"
+            src={`${BASE}hp_logo.png`}
             alt="healthplans.ai"
           />
         </div>
@@ -180,23 +133,23 @@ export default function ProductAccessPortal() {
           </div>
           <div className="product-intro__art">
             <img
-              src="/plugin.png"
+              src={`${BASE}plugin.png`}
               alt=""
               className="product-intro__img"
             />
           </div>
         </section>
 
-        <section className="channels" aria-label="Choose web or desktop">
+        <section className="channels" aria-label="Choose desktop or web">
           <div className="channels__grid">
-            <MainChannelCard
-              config={MAIN_CARDS.web}
-              onOpen={() => openChannel("web")}
-            />
-            <MainChannelCard
-              config={MAIN_CARDS.desktop}
-              onOpen={() => openChannel("desktop")}
-            />
+            {CHANNELS.map((config, i) => (
+              <ChannelCard
+                key={config.id}
+                config={config}
+                index={i}
+                onOpen={() => setOpenChannel(config.id)}
+              />
+            ))}
           </div>
         </section>
       </main>
@@ -216,27 +169,30 @@ export default function ProductAccessPortal() {
         </div>
       </footer>
 
-      {modal && (
-        <ChannelModal
-          modal={modal}
+      {openChannel && (
+        <ResourceModal
+          channel={CHANNELS.find((c) => c.id === openChannel)}
           onClose={closeModal}
-          onSelectPlatform={selectPlatform}
-          onBack={goBackInModal}
         />
       )}
     </div>
   );
 }
 
-function MainChannelCard({ config, onOpen }) {
+function ChannelCard({ config, index, onOpen }) {
   const Icon = config.icon;
+  const { locked } = config;
 
   return (
-    <article className="main-card">
+    <article
+      className={`main-card${locked ? " main-card--locked" : ""}`}
+      style={{ "--i": index }}
+    >
       <button
         type="button"
         className="main-card__trigger"
-        onClick={onOpen}
+        onClick={locked ? undefined : onOpen}
+        aria-disabled={locked}
       >
         <div className="main-card__row">
           <div className="main-card__icon-wrap">
@@ -246,24 +202,36 @@ function MainChannelCard({ config, onOpen }) {
             <h2 className="main-card__title">{config.label}</h2>
             <p className="main-card__subtitle">{config.subtitle}</p>
           </div>
-          <span className="main-card__open-hint" aria-hidden>
-            <ArrowRight size={22} />
-          </span>
+          {locked ? (
+            <span className="main-card__badge">
+              <Lock size={13} aria-hidden /> Coming soon
+            </span>
+          ) : (
+            <span className="main-card__open-hint" aria-hidden>
+              <ArrowRight size={22} />
+            </span>
+          )}
         </div>
 
         <p className="main-card__body">{config.description}</p>
-        <p className="main-card__cta">Click to choose platform &amp; links</p>
+        <p className="main-card__cta">
+          {locked ? (
+            <>
+              <Lock size={14} aria-hidden /> Locked for now
+            </>
+          ) : (
+            <>Click to open resources</>
+          )}
+        </p>
       </button>
     </article>
   );
 }
 
-function ChannelModal({ modal, onClose, onSelectPlatform, onBack }) {
+function ResourceModal({ channel, onClose }) {
   const titleId = useId();
-  const channelConfig = MAIN_CARDS[modal.channel];
-  const ChannelIcon = channelConfig.icon;
-  const isActions = modal.step === "actions" && modal.platform;
-  const platformMeta = isActions ? PLATFORMS[modal.platform] : null;
+  const ChannelIcon = channel.icon;
+  const links = resolveLinks(channel.id);
 
   return (
     <div
@@ -280,21 +248,22 @@ function ChannelModal({ modal, onClose, onSelectPlatform, onBack }) {
         aria-labelledby={titleId}
       >
         <div className="modal-panel__top">
-          {modal.step === "actions" ? (
-            <button
-              type="button"
-              className="modal-icon-btn"
-              onClick={onBack}
-              aria-label="Back to platform choice"
-            >
-              <ChevronLeft size={22} />
-            </button>
-          ) : (
-            <span className="modal-panel__spacer" aria-hidden />
-          )}
+          <div className="modal-panel__brand">
+            <span className="modal-panel__brand-icon">
+              <ChannelIcon size={26} strokeWidth={1.75} aria-hidden />
+            </span>
+            <div>
+              <h2 id={titleId} className="modal-panel__title">
+                {channel.label}
+              </h2>
+              <p className="modal-panel__subtitle">
+                Choose what you would like to do.
+              </p>
+            </div>
+          </div>
           <button
             type="button"
-            className="modal-icon-btn modal-icon-btn--close"
+            className="modal-icon-btn"
             onClick={onClose}
             aria-label="Close"
           >
@@ -302,73 +271,57 @@ function ChannelModal({ modal, onClose, onSelectPlatform, onBack }) {
           </button>
         </div>
 
-        <div className="modal-panel__hero">
-          <div className="modal-panel__brand">
-            <span className="modal-panel__brand-icon">
-              <ChannelIcon size={26} strokeWidth={1.75} aria-hidden />
-            </span>
-            <div>
-              <h2 id={titleId} className="modal-panel__title">
-                {isActions
-                  ? `${channelConfig.label} · ${platformMeta.label}`
-                  : channelConfig.label}
-              </h2>
-              <p className="modal-panel__subtitle">
-                {isActions
-                  ? "Download, open the dashboard, or grab the handout."
-                  : "Choose your platform to continue."}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div
-          key={modal.step + (modal.platform || "")}
-          className="modal-pane"
-        >
-          {modal.step === "platform" && (
-            <div className="platform-row platform-row--modal">
-              {["windows", "mac"].map((pid) => {
-                const p = PLATFORMS[pid];
-                const PIcon = p.icon;
-                return (
-                  <button
-                    key={pid}
-                    type="button"
-                    className="platform-card"
-                    onClick={() => onSelectPlatform(pid)}
-                  >
-                    <div className="platform-card__top">
-                      <span className="platform-card__icon">
-                        <PIcon size={22} strokeWidth={1.75} aria-hidden />
-                      </span>
-                      <span className="platform-card__label">{p.label}</span>
-                      <ArrowRight
-                        className="platform-card__arrow"
-                        size={18}
-                        aria-hidden
-                      />
-                    </div>
-                    <p className="platform-card__desc">{p.description}</p>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {modal.step === "actions" && modal.platform && (
-            <div className="modal-actions-block">
-              <p className="platform-actions__hint">
-                Resources for {channelConfig.label} · {platformMeta.label}
-              </p>
-              <ActionLinks
-                channel={modal.channel}
-                platform={modal.platform}
-              />
-            </div>
-          )}
+        <div className="resource-grid">
+          {RESOURCES.map((r, i) => (
+            <ResourceCard
+              key={r.id}
+              resource={r}
+              url={links[r.linkKey]}
+              index={i}
+            />
+          ))}
         </div>
       </div>
     </div>
+  );
+}
+
+function ResourceCard({ resource, url, index }) {
+  const Icon = resource.icon;
+  const disabled = !url;
+  const isDownload = resource.id === "application";
+
+  return (
+    <a
+      className={`resource-card${disabled ? " resource-card--disabled" : ""}`}
+      style={{ "--i": index }}
+      href={url || "#"}
+      onClick={(e) => {
+        if (disabled) e.preventDefault();
+      }}
+      target={isDownload ? undefined : "_blank"}
+      rel="noopener noreferrer"
+      aria-disabled={disabled}
+    >
+      <span className="resource-card__icon">
+        <Icon size={26} strokeWidth={1.75} aria-hidden />
+      </span>
+      <h3 className="resource-card__title">{resource.label}</h3>
+      <p className="resource-card__desc">{resource.description}</p>
+      <span className="resource-card__action">
+        {disabled ? (
+          "Link not available yet"
+        ) : (
+          <>
+            {resource.action}
+            {isDownload ? (
+              <Download size={16} aria-hidden />
+            ) : (
+              <ExternalLink size={16} aria-hidden />
+            )}
+          </>
+        )}
+      </span>
+    </a>
   );
 }
